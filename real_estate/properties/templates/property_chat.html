@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Property Chat Assistant</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --background-color: #f8f9fa;
+            --border-color: #dfe6e9;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 100%;
+            margin: 20px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 4px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        #chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect fill="%23e5e5e5" x="50" width="50" height="50"/><rect fill="%23e5e5e5" y="50" width="50" height="50"/></svg>');
+            background-size: 12px 12px;
+            border-radius: 10px;
+        }
+
+        .message {
+            margin: 15px 0;
+            padding: 15px 20px;
+            border-radius: 20px;
+            max-width: 75%;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        .user-message {
+            background: var(--primary-color);
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+
+        .assistant-message {
+            background: white;
+            border: 1px solid var(--border-color);
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        #chat-form {
+            display: flex;
+            padding: 20px;
+            background: var(--background-color);
+            border-top: 1px solid #eee;
+            justify-content: center;
+        }
+
+        #user-input {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid var(--border-color);
+            border-radius: 30px;
+            margin-right: 15px;
+            font-size: 18px;
+            transition: border-color 0.3s;
+            width: 70%;
+        }
+
+        #user-input:focus {
+            outline: none;
+            border-color: var(--secondary-color);
+        }
+
+        button {
+            padding: 15px 25px;
+            background: var(--secondary-color);
+            color: white;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.3s;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background: #2980b9;
+            transform: scale(1.05);
+        }
+
+        .loading {
+            display: none;
+            padding: 10px;
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+
+        .rating {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 10px;
+        }
+
+        .rating span {
+            cursor: pointer;
+            font-size: 24px;
+            color: #ccc;
+            transition: color 0.2s;
+        }
+
+        .rating span:hover,
+        .rating span.active {
+            color: #f39c12;
+        }
+
+        .correction-button {
+            margin-top: 10px;
+            padding: 5px 10px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .correction-button:hover {
+            background: #c0392b;
+        }
+
+        .correction-form {
+            margin-top: 10px;
+        }
+
+        .correction-form textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            resize: vertical;
+        }
+
+        .correction-form button {
+            margin-top: 5px;
+            padding: 5px 10px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .correction-form button:hover {
+            background: #2980b9;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+<head>
+    <title>Property Chat Assistant</title>
+
+</head>
+<body>
+    <div class="header">Property Finder Chat</div>
+
+    <div class="chat-container">
+        <div id="chat-messages">
+            <div class="message assistant-message" id="welcome-message">
+                <div class="message-content">
+                    Welcome to Property Finder! 🏡<br>
+                    How can I help you find your perfect property?<br>
+                    Examples:<br>
+                    • "Show me 3-bedroom homes under $500k"<br>
+                    • "Find luxury condos in Miami"<br>
+                    • "Cheap apartments near New York, max $300k"
+                </div>
+                
+            </div>
+        </div>
+        <div class="loading">Searching properties...</div>
+        <form id="chat-form">
+            <input type="text" id="user-input" placeholder="Type your property request...">
+            <button type="submit">Send</button>
+        </form>
+    </div>
+
+    <script>
+        const chatMessages = document.getElementById('chat-messages');
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+        const loadingIndicator = document.querySelector('.loading');
+
+        let conversationHistory = [];
+
+        function appendMessage(role, content, isFirstMessage = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}-message`;
+
+            // Add the message content
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            if (content.includes('Found Properties:')) {
+                messageContent.innerHTML = content;
+            } else {
+                messageContent.textContent = content; 
+            }
+            messageDiv.appendChild(messageContent);
+
+            if (role === 'assistant' && !isFirstMessage) {
+                console.log('Adding rating and correction options for assistant message');
+
+                const ratingDiv = document.createElement('div');
+                ratingDiv.className = 'rating';
+                ratingDiv.innerHTML = `
+                    <span data-rating="1">★</span>
+                    <span data-rating="2">★</span>
+                    <span data-rating="3">★</span>
+                    <span data-rating="4">★</span>
+                    <span data-rating="5">★</span>
+                `;
+                messageDiv.appendChild(ratingDiv);
+
+                const correctionButton = document.createElement('button');
+                correctionButton.textContent = 'Suggest Correction';
+                correctionButton.className = 'correction-button';
+                correctionButton.onclick = () => showCorrectionForm(messageDiv);
+                messageDiv.appendChild(correctionButton);
+            }
+
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight; 
+        }
+
+        function showCorrectionForm(messageDiv) {
+            console.log('Showing correction form');
+            const correctionForm = document.createElement('div');
+            correctionForm.className = 'correction-form';
+            correctionForm.innerHTML = `
+                <textarea placeholder="Suggest a correction..."></textarea>
+                <button onclick="submitCorrection(this)">Submit</button>
+            `;
+            messageDiv.appendChild(correctionForm);
+        }
+
+        // Function to submit a correction
+        function submitCorrection(button) {
+            console.log('Submitting correction');
+            const correctionText = button.previousElementSibling.value;
+            if (!correctionText) {
+                alert('Please enter a correction.');
+                return;
+            }
+
+
+            const assistantMessage = button.closest('.message').querySelector('.message-content').textContent;
+
+
+            fetch('/api/corrections/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken') 
+                },
+                body: JSON.stringify({
+                    message: assistantMessage,
+                    correction: correctionText
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                alert('Thank you for your correction!');
+                button.closest('.correction-form').remove(); 
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while submitting your correction.');
+            });
+        }
+
+
+        document.addEventListener('click', (e) => {
+            if (e.target.matches('.rating span')) {
+                console.log('Rating clicked');
+                const rating = e.target.getAttribute('data-rating');
+                const assistantMessage = e.target.closest('.message').querySelector('.message-content').textContent;
+
+
+                fetch('/api/ratings/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken') 
+                    },
+                    body: JSON.stringify({
+                        message: assistantMessage,
+                        rating: rating
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    alert(`You rated this response ${rating} stars. Thank you!`);
+                    // Highlight the selected rating
+                    e.target.classList.add('active');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while submitting your rating.');
+                });
+            }
+        });
+
+        async function sendMessage(event) {
+            event.preventDefault();
+            const userMessage = userInput.value.trim();
+            if (!userMessage) return;
+
+            appendMessage('user', userMessage);
+            userInput.value = ''; 
+            loadingIndicator.style.display = 'block'; 
+
+            try {
+                conversationHistory.push({ role: 'user', content: userMessage });
+
+                const response = await fetch('/properties/chat/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken') 
+                    },
+                    body: JSON.stringify(conversationHistory)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                conversationHistory = data.messages;
+
+
+                const assistantResponse = data.messages[data.messages.length - 1].content;
+                appendMessage('assistant', assistantResponse);
+
+            } catch (error) {
+                console.error('Error:', error);
+                appendMessage('assistant', `⚠️ Error: ${error.message}`);
+            } finally {
+                loadingIndicator.style.display = 'none'; 
+            }
+        }
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Event listener for form submission
+        chatForm.addEventListener('submit', sendMessage);
+
+        // Allow Enter key to send message (Shift+Enter for new line)
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                chatForm.requestSubmit();
+            }
+        });
+    </script>
+</body>
+</html>
