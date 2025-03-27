@@ -9,6 +9,8 @@ Natural Language Query: The LLM-based query agent interprets user queries in nat
 
 Real Estate Dataset: The application uses an open-source property dataset sourced from Kaggle to display available listings.
 
+Ranking: The app accepts users rattings and corrections for better future performance
+
 Example of queries:
 1. Price-related Queries
 "Show me properties under $500,000."
